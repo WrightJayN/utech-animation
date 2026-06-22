@@ -1,15 +1,15 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import Link from 'next/link'
 import { FadeUp, StaggerGrid } from '@/components/ui/AnimatedSection'
 import AnimatedCard from '@/components/ui/AnimatedCard'
+import SearchAndFilter from '@/components/ui/SearchAndFilter'
 
 export default async function Home({
   searchParams
 }: {
-  searchParams: { tag?: string; q?: string }
+  searchParams: Promise<{ tag?: string; q?: string }>
 }) {
   const supabase = await createServerSupabaseClient()
-  const params = await searchParams        // ← await it
+  const params = await searchParams
   const activeTag = params.tag ?? null
   const query = params.q ?? null
 
@@ -18,14 +18,16 @@ export default async function Home({
 
   // Build portfolio query
   let portfolioQuery = supabase
-    .from('portfolios')
-    .select(`
-      id, title, slug, cover_image_url, created_at,
-      profiles (full_name, username),
-      portfolio_tags (tags (name))
-    `)
-    .eq('is_public', true)
-    .order('created_at', { ascending: false })
+  .from('portfolios')
+  .select(`
+    id, title, slug, cover_image_url, created_at,
+    profiles (full_name, username),
+    portfolio_tags (tags (name))
+  `)
+  .eq('is_public', true)        // ← remove this line
+  .eq('visibility', 'public')   // ← add this
+  .eq('status', 'active')       // ← add this
+  .order('created_at', { ascending: false })
 
   if (query) {
     portfolioQuery = portfolioQuery.ilike('title', `%${query}%`)
@@ -33,7 +35,7 @@ export default async function Home({
 
   const { data: portfolios } = await portfolioQuery
 
-  // Filter by tag client-side (simpler than a join filter for now)
+  // Filter by tag client-side
   const filtered = activeTag
     ? portfolios?.filter((p: any) =>
         p.portfolio_tags?.some((pt: any) => pt.tags.name === activeTag)
@@ -74,58 +76,8 @@ export default async function Home({
         </div>
       </FadeUp>
 
-      {/* Search */}
-      <form method="GET" style={{ marginBottom: 32, maxWidth: 480, margin: '0 auto 32px' }}>
-        <div style={{ position: 'relative' }}>
-          <input
-            name="q"
-            defaultValue={query ?? ''}
-            placeholder="Search portfolios..."
-            style={{
-              width: '100%', padding: '13px 48px 13px 18px',
-              background: 'var(--surface)', border: '1.5px solid var(--border)',
-              borderRadius: 10, color: 'var(--text)', fontSize: 15,
-              outline: 'none', fontFamily: 'var(--font-body)'
-            }}
-          />
-          <button type="submit" style={{
-            position: 'absolute', right: 14, top: '50%',
-            transform: 'translateY(-50%)',
-            background: 'transparent', border: 'none',
-            cursor: 'pointer', fontSize: 18
-          }}>🔍</button>
-        </div>
-      </form>
-
-      {/* Tag Filter */}
-      <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: 8,
-        justifyContent: 'center', marginBottom: 48
-      }}>
-        <Link href="/" style={{
-          padding: '8px 18px', borderRadius: 100,
-          fontSize: 13, fontWeight: 500,
-          border: `1.5px solid ${!activeTag ? 'var(--accent)' : 'var(--border)'}`,
-          background: !activeTag ? 'var(--accent)' : 'transparent',
-          color: !activeTag ? '#fff' : 'var(--muted)'
-        }}>
-          All
-        </Link>
-        {tags?.map((tag: any) => {
-          const active = activeTag === tag.name
-          return (
-            <Link key={tag.id} href={`/?tag=${encodeURIComponent(tag.name)}`} style={{
-              padding: '8px 18px', borderRadius: 100,
-              fontSize: 13, fontWeight: 500,
-              border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-              background: active ? 'var(--accent)' : 'transparent',
-              color: active ? '#fff' : 'var(--muted)'
-            }}>
-              {tag.name}
-            </Link>
-          )
-        })}
-      </div>
+      {/* Search + Tag Filter — client component handles interactivity */}
+      <SearchAndFilter tags={tags ?? []} activeTag={activeTag} query={query} />
 
       {/* Results count */}
       <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 24 }}>
@@ -153,7 +105,9 @@ export default async function Home({
           <p style={{ fontSize: 40, marginBottom: 16 }}>🎨</p>
           <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No portfolios yet</p>
           <p style={{ fontSize: 14 }}>
-            {activeTag ? `No portfolios tagged with "${activeTag}" yet.` : 'Be the first to upload your work.'}
+            {activeTag
+              ? `No portfolios tagged with "${activeTag}" yet.`
+              : 'Be the first to upload your work.'}
           </p>
         </div>
       )}

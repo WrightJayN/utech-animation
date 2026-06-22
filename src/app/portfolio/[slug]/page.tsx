@@ -1,23 +1,33 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import Lightbox from '@/components/ui/Lightbox'
+import LikesAndComments from '@/components/ui/LikesAndComments'
 
-export default async function PortfolioPage({ params }: { params: { slug: string } }) {
+export default async function PortfolioPage({ params }: { params: Promise<{ slug: string }> }) {
   const supabase = await createServerSupabaseClient()
+  const { slug } = await params
 
-  // Fetch portfolio + owner profile
   const { data: portfolio } = await supabase
-    .from('portfolios')
-    .select(`
-        *,
-        profiles (full_name, username, bio, avatar_url, year_of_study),
-        portfolio_tags (tags (name)),
-        portfolio_items (id, type, url, caption, display_order)
-    `)
-    .eq('slug', params.slug)
-    .eq('is_public', true)
-    .single()
+  .from('portfolios')
+  .select(`...`)
+  .eq('slug', slug)
+  .eq('status', 'active')        // ← replaces is_public check
+  .neq('visibility', 'private')  // ← blocks private from public view
+  .single()
 
   if (!portfolio) notFound()
+
+  // Fetch like + comment counts for display without auth
+  const { count: likeCount } = await supabase
+    .from('likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('portfolio_id', portfolio.id)
+
+  const { count: commentCount } = await supabase
+    .from('comments')
+    .select('*', { count: 'exact', head: true })
+    .eq('portfolio_id', portfolio.id)
 
   const tags = portfolio.portfolio_tags?.map((pt: any) => pt.tags.name) ?? []
   const owner = portfolio.profiles as any
@@ -53,9 +63,7 @@ export default async function PortfolioPage({ params }: { params: { slug: string
           }}>
             {portfolio.title}
           </h1>
-
-          {/* Tags */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {tags.map((tag: string) => (
               <span key={tag} style={{
                 padding: '6px 14px', borderRadius: 100,
@@ -67,16 +75,27 @@ export default async function PortfolioPage({ params }: { params: { slug: string
               </span>
             ))}
           </div>
+          {/* Quick stats */}
+          <div style={{ display: 'flex', gap: 16 }}>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+              ♥ {likeCount ?? 0} likes
+            </span>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+              💬 {commentCount ?? 0} comments
+            </span>
+          </div>
         </div>
 
-        {/* Owner card */}
-        <div style={{
+        {/* Owner card — now a clickable link */}
+        <Link href={`/profile/${owner?.username}`} style={{
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 12, padding: '16px 20px',
           display: 'flex', alignItems: 'center', gap: 14,
-          minWidth: 200
-        }}>
+          minWidth: 200, transition: 'border-color 0.15s'
+        }}
+          onMouseEnter={undefined}
+        >
           <div style={{
             width: 44, height: 44, borderRadius: '50%',
             background: 'var(--accent)',
@@ -87,11 +106,11 @@ export default async function PortfolioPage({ params }: { params: { slug: string
           </div>
           <div>
             <p style={{ fontWeight: 600, fontSize: 15 }}>{owner?.full_name}</p>
-            <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-              {owner?.year_of_study ?? 'UTech Animation Student'}
+            <p style={{ color: 'var(--accent)', fontSize: 13 }}>
+              View profile →
             </p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Divider */}
@@ -107,51 +126,17 @@ export default async function PortfolioPage({ params }: { params: { slug: string
         </p>
       )}
 
-      {/* Media Grid */}
+      {/* Media */}
       {portfolio.portfolio_items && portfolio.portfolio_items.length > 0 && (
-      <div style={{ marginTop: 48 }}>
+        <div style={{ marginTop: 48 }}>
           <h2 style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 22, fontWeight: 700, marginBottom: 24
+            fontFamily: 'var(--font-display)',
+            fontSize: 22, fontWeight: 700, marginBottom: 24
           }}>
-          Work
+            Work
           </h2>
-          <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: 16
-          }}>
-          {portfolio.portfolio_items
-              .sort((a: any, b: any) => a.display_order - b.display_order)
-              .map((item: any) => (
-              <div key={item.id} style={{
-                  borderRadius: 10, overflow: 'hidden',
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)'
-              }}>
-                  {item.type === 'video' ? (
-                  <video
-                      src={item.url} controls
-                      style={{ width: '100%', maxHeight: 320, objectFit: 'cover' }}
-                  />
-                  ) : (
-                  <img
-                      src={item.url} alt={item.caption ?? ''}
-                      style={{ width: '100%', objectFit: 'cover' }}
-                  />
-                  )}
-                  {item.caption && (
-                  <p style={{
-                      padding: '10px 14px',
-                      fontSize: 13, color: 'var(--muted)'
-                  }}>
-                      {item.caption}
-                  </p>
-                  )}
-              </div>
-              ))}
-          </div>
-      </div>
+          <Lightbox items={portfolio.portfolio_items.sort((a: any, b: any) => a.display_order - b.display_order)} />
+        </div>
       )}
 
       {/* Posted date */}
@@ -161,6 +146,8 @@ export default async function PortfolioPage({ params }: { params: { slug: string
         })}
       </p>
 
+      {/* Likes + Comments */}
+      <LikesAndComments portfolioId={portfolio.id} />
     </div>
   )
 }

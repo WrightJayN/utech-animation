@@ -15,12 +15,17 @@ export default async function Dashboard() {
     .eq('id', user.id)
     .single()
 
+  // Check if admin
+  const { data: adminRole } = await supabase
+    .from('admin_roles')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .single()
+  const isAdmin = !!adminRole
+
   const { data: portfolios } = await supabase
     .from('portfolios')
-    .select(`
-      *,
-      portfolio_tags (tags (name))
-    `)
+    .select(`*, portfolio_tags (tags (name)), takedowns(id, reason, appeal_status, appeal_message)`)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -43,13 +48,24 @@ export default async function Dashboard() {
             {profile?.full_name ?? 'Student'}
           </h1>
         </div>
-        <Link href="/upload" style={{
-          background: 'var(--accent)', color: '#fff',
-          padding: '12px 24px', borderRadius: 8,
-          fontSize: 14, fontWeight: 600
-        }}>
-          + New Portfolio
-        </Link>
+        <div style={{ display: 'flex', gap: 12 }}>
+          {isAdmin && (
+            <Link href="/admin" style={{
+              background: '#7c3aed', color: '#fff',
+              padding: '12px 24px', borderRadius: 8,
+              fontSize: 14, fontWeight: 600
+            }}>
+              Admin Panel
+            </Link>
+          )}
+          <Link href="/upload" style={{
+            background: 'var(--accent)', color: '#fff',
+            padding: '12px 24px', borderRadius: 8,
+            fontSize: 14, fontWeight: 600
+          }}>
+            + New Portfolio
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
@@ -60,8 +76,9 @@ export default async function Dashboard() {
       }}>
         {[
           { label: 'Total Portfolios', value: portfolios?.length ?? 0 },
-          { label: 'Published', value: portfolios?.filter(p => p.is_public).length ?? 0 },
-          { label: 'Hidden', value: portfolios?.filter(p => !p.is_public).length ?? 0 },
+          { label: 'Public', value: portfolios?.filter(p => p.visibility === 'public' && p.status === 'active').length ?? 0 },
+          { label: 'Unlisted', value: portfolios?.filter(p => p.visibility === 'unlisted').length ?? 0 },
+          { label: 'Private', value: portfolios?.filter(p => p.visibility === 'private').length ?? 0 },
         ].map(stat => (
           <div key={stat.label} style={{
             background: 'var(--surface)', border: '1px solid var(--border)',
