@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase'
-import PortfolioCard from '@/components/ui/PortfolioCard'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { FadeUp, StaggerGrid } from '@/components/ui/AnimatedSection'
 import AnimatedCard from '@/components/ui/AnimatedCard'
@@ -9,9 +8,10 @@ export default async function Home({
 }: {
   searchParams: { tag?: string; q?: string }
 }) {
-  const supabase = createClient()
-  const activeTag = searchParams.tag ?? null
-  const query = searchParams.q ?? null
+  const supabase = await createServerSupabaseClient()
+  const params = await searchParams        // ← await it
+  const activeTag = params.tag ?? null
+  const query = params.q ?? null
 
   // Fetch tags for filter bar
   const { data: tags } = await supabase.from('tags').select('*').order('name')
@@ -142,8 +142,8 @@ export default async function Home({
           gap: 24
         }}>
           {filtered.map((portfolio: any) => (
-            <PortfolioCard key={portfolio.id} portfolio={portfolio} />
-          ))}  
+            <AnimatedCard key={portfolio.id} portfolio={portfolio} />
+          ))}
         </StaggerGrid>
       ) : (
         <div style={{

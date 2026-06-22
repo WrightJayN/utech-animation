@@ -32,6 +32,23 @@ export default function Upload() {
     )
   }
 
+  const [mediaFiles, setMediaFiles] = useState<File[]>([])
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([])
+
+  const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = Array.from(e.target.files ?? [])
+  if (!files.length) return
+  setMediaFiles(prev => [...prev, ...files])
+  files.forEach(file => {
+      setMediaPreviews(prev => [...prev, URL.createObjectURL(file)])
+  })
+  }
+
+    const removeMedia = (index: number) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== index))
+    setMediaPreviews(prev => prev.filter((_, i) => i !== index))
+    }
+
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -98,7 +115,23 @@ export default function Upload() {
         )
       }
 
-      // 5. Done — go to the public portfolio page
+      // 5. Upload media items
+      if (mediaFiles.length > 0) {
+        const itemUploads = await Promise.all(
+          mediaFiles.map(async (file, index) => {
+            const ext = file.name.split('.').pop()
+            const filePath = `${userId}/items/${Date.now()}-${index}.${ext}`
+            await supabase.storage.from('portfolios').upload(filePath, file)
+            const { data: { publicUrl } } = supabase.storage
+              .from('portfolios').getPublicUrl(filePath)
+            const type = file.type.startsWith('video') ? 'video' : 'image'
+            return { portfolio_id: portfolio.id, type, url: publicUrl, display_order: index }
+          })
+        )
+        await supabase.from('portfolio_items').insert(itemUploads)
+      }
+
+      // 6. Done — go to the public portfolio page
       router.push(`/portfolio/${slug}`)
 
     } catch (err: any) {
@@ -189,6 +222,57 @@ export default function Upload() {
               />
             </label>
           )}
+        </div>
+
+        {/* Media Items */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <label style={{ fontSize: 13, fontWeight: 500 }}>
+            Portfolio Media (images or videos)
+          </label>
+
+          {/* Previews */}
+          {mediaPreviews.length > 0 && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: 10
+            }}>
+              {mediaPreviews.map((src, i) => (
+                <div key={i} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden' }}>
+                  {mediaFiles[i]?.type.startsWith('video') ? (
+                    <video src={src} style={{ width: '100%', height: 120, objectFit: 'cover' }} />
+                  ) : (
+                    <img src={src} alt="" style={{ width: '100%', height: 120, objectFit: 'cover' }} />
+                  )}
+                  <button
+                    onClick={() => removeMedia(i)}
+                    style={{
+                      position: 'absolute', top: 6, right: 6,
+                      background: 'rgba(0,0,0,0.7)', color: '#fff',
+                      border: 'none', borderRadius: '50%',
+                      width: 24, height: 24, cursor: 'pointer',
+                      fontSize: 14, display: 'flex',
+                      alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <label style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: '14px',
+            border: '2px dashed var(--border)', borderRadius: 8,
+            cursor: 'pointer', color: 'var(--muted)', fontSize: 14
+          }}>
+            <span>+ Add Images or Videos</span>
+            <input
+              type="file" accept="image/*,video/*"
+              multiple style={{ display: 'none' }}
+              onChange={handleMediaChange}
+            />
+          </label>
         </div>
 
         {/* Tags */}

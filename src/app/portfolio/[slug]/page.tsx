@@ -8,11 +8,10 @@ export default async function PortfolioPage({ params }: { params: { slug: string
   const { data: portfolio } = await supabase
     .from('portfolios')
     .select(`
-      *,
-      profiles (full_name, username, bio, avatar_url, year_of_study),
-      portfolio_tags (
-        tags (name)
-      )
+        *,
+        profiles (full_name, username, bio, avatar_url, year_of_study),
+        portfolio_tags (tags (name)),
+        portfolio_items (id, type, url, caption, display_order)
     `)
     .eq('slug', params.slug)
     .eq('is_public', true)
@@ -106,6 +105,53 @@ export default async function PortfolioPage({ params }: { params: { slug: string
         }}>
           {portfolio.description}
         </p>
+      )}
+
+      {/* Media Grid */}
+      {portfolio.portfolio_items && portfolio.portfolio_items.length > 0 && (
+      <div style={{ marginTop: 48 }}>
+          <h2 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 22, fontWeight: 700, marginBottom: 24
+          }}>
+          Work
+          </h2>
+          <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: 16
+          }}>
+          {portfolio.portfolio_items
+              .sort((a: any, b: any) => a.display_order - b.display_order)
+              .map((item: any) => (
+              <div key={item.id} style={{
+                  borderRadius: 10, overflow: 'hidden',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)'
+              }}>
+                  {item.type === 'video' ? (
+                  <video
+                      src={item.url} controls
+                      style={{ width: '100%', maxHeight: 320, objectFit: 'cover' }}
+                  />
+                  ) : (
+                  <img
+                      src={item.url} alt={item.caption ?? ''}
+                      style={{ width: '100%', objectFit: 'cover' }}
+                  />
+                  )}
+                  {item.caption && (
+                  <p style={{
+                      padding: '10px 14px',
+                      fontSize: 13, color: 'var(--muted)'
+                  }}>
+                      {item.caption}
+                  </p>
+                  )}
+              </div>
+              ))}
+          </div>
+      </div>
       )}
 
       {/* Posted date */}
