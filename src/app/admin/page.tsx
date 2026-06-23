@@ -16,15 +16,27 @@ export default async function AdminPage() {
 
   if (!adminRole) redirect('/dashboard')
 
-  const { data: portfolios } = await supabase
+  const { data: portfolios, error } = await supabase
     .from('portfolios')
     .select(`
       *,
       profiles (full_name, username),
       portfolio_tags (tags (name)),
-      takedowns (id, reason, appeal_status, appeal_message, created_at)
+      takedowns (id, reason, appeal_status, appeal_message, appeal_denied_at, scheduled_wipe_at, created_at),
+      reports (id, category, status, details, created_at, reporter_id),
+      warnings (id, reason, duration_days, expires_at, created_at)
     `)
     .order('created_at', { ascending: false })
+
+  if (error) console.error('Admin query error:', error)
+
+  const pendingAppeals = portfolios?.filter(p =>
+    p.takedowns?.some((t: any) => t.appeal_status === 'pending')
+  ).length ?? 0
+
+  const pendingReports = portfolios?.filter(p =>
+    p.reports?.some((r: any) => r.status === 'pending')
+  ).length ?? 0
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '48px 24px 96px' }}>
@@ -42,13 +54,19 @@ export default async function AdminPage() {
           Portfolio Moderation
         </h1>
         <p style={{ color: 'var(--muted)', marginTop: 8 }}>
-          {portfolios?.length ?? 0} total portfolios ·{' '}
+          {portfolios?.length ?? 0} total ·{' '}
           {portfolios?.filter(p => p.status === 'taken_down').length ?? 0} taken down ·{' '}
-          {portfolios?.filter(p => p.takedowns?.some((t: any) => t.appeal_status === 'pending')).length ?? 0} pending appeals
+          {pendingAppeals} pending appeals ·{' '}
+          {pendingReports} pending reports
         </p>
       </div>
 
-      <AdminClient portfolios={portfolios ?? []} adminId={user.id} />
+      <AdminClient
+        portfolios={portfolios ?? []}
+        adminId={user.id}
+        pendingAppeals={pendingAppeals}
+        pendingReports={pendingReports}
+      />
     </div>
   )
 }

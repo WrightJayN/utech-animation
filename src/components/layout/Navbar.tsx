@@ -5,17 +5,39 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
+import Avatar from '../ui/Avatar'
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<any>(null)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+      if (data.user) {
+        supabase.from('profiles')
+          .select('full_name, avatar_url, username')
+          .eq('id', data.user.id)
+          .single()
+          .then(({ data: p }) => setProfile(p))
+      }
+    })
+
     const { data: listener } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null)
+      if (session?.user) {
+        supabase.from('profiles')
+          .select('full_name, avatar_url, username')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: p }) => setProfile(p))
+      } else {
+        setProfile(null)
+      }
     })
+
     return () => listener.subscription.unsubscribe()
   }, [])
 
@@ -55,6 +77,12 @@ export default function Navbar() {
               }}>
                 Dashboard
               </Link>
+              <Link href="/settings" style={{
+                fontSize: 14, fontWeight: 500, color: 'var(--muted)',
+                transition: 'color 0.15s'
+              }}>
+                Settings
+              </Link>
               <Link href="/upload" style={{
                 background: 'var(--accent)', color: '#fff',
                 padding: '8px 18px', borderRadius: 8,
@@ -63,6 +91,7 @@ export default function Navbar() {
               }}>
                 + New Portfolio
               </Link>
+              <Avatar url={profile?.avatar_url} name={profile?.full_name} size={32} />
               <button onClick={signOut} style={{
                 background: 'transparent', border: '1px solid var(--border)',
                 color: 'var(--muted)', padding: '8px 14px',

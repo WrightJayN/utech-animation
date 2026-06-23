@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import Avatar from './Avatar'
 
 export default function LikesAndComments({ portfolioId }: { portfolioId: string }) {
   const [user, setUser] = useState<any>(null)
@@ -127,14 +128,7 @@ export default function LikesAndComments({ portfolioId }: { portfolioId: string 
           }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                <div style={{
-                  width: 30, height: 30, borderRadius: '50%',
-                  background: 'var(--accent)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 700, flexShrink: 0
-                }}>
-                  {comment.profiles?.full_name?.[0]?.toUpperCase() ?? '?'}
-                </div>
+                <Avatar url={comment.profiles?.avatar_url} name={comment.profiles?.full_name} size={30} />
                 <span style={{ fontWeight: 600, fontSize: 14 }}>
                   {comment.profiles?.full_name}
                 </span>

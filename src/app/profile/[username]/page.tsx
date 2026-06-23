@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notFound } from 'next/navigation'
 import { StaggerGrid } from '@/components/ui/AnimatedSection'
 import AnimatedCard from '@/components/ui/AnimatedCard'
+import Avatar from '@/components/ui/Avatar'
 
 export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const supabase = await createServerSupabaseClient()
@@ -23,13 +24,16 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
       portfolio_tags (tags (name))
     `)
     .eq('user_id', profile.id)
-    .eq('is_public', true)
+    .eq('visibility', 'public')
+    .eq('status', 'active')
     .order('created_at', { ascending: false })
 
   const { count: totalLikes } = await supabase
     .from('likes')
     .select('*, portfolios!inner(user_id)', { count: 'exact', head: true })
     .eq('portfolios.user_id', profile.id)
+
+  const initial = profile.full_name?.trim()?.[0]?.toUpperCase() ?? '?'
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 24px 96px' }}>
@@ -39,14 +43,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
         display: 'flex', alignItems: 'center', gap: 28,
         marginBottom: 64, flexWrap: 'wrap'
       }}>
-        <div style={{
-          width: 88, height: 88, borderRadius: '50%',
-          background: 'var(--accent)', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 36, fontWeight: 800, color: '#fff'
-        }}>
-          {profile.full_name?.[0]?.toUpperCase() ?? '?'}
-        </div>
+        <Avatar url={profile.avatar_url} name={profile.full_name} size={88} />
         <div style={{ flex: 1 }}>
           <h1 style={{
             fontFamily: 'var(--font-display)',

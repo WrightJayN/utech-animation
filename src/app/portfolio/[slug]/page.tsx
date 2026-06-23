@@ -3,22 +3,30 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Lightbox from '@/components/ui/Lightbox'
 import LikesAndComments from '@/components/ui/LikesAndComments'
+import ReportButton from '@/components/ui/ReportButton'
+import Avatar from '@/components/ui/Avatar'
 
 export default async function PortfolioPage({ params }: { params: Promise<{ slug: string }> }) {
   const supabase = await createServerSupabaseClient()
   const { slug } = await params
 
   const { data: portfolio } = await supabase
-  .from('portfolios')
-  .select(`...`)
-  .eq('slug', slug)
-  .eq('status', 'active')        // ← replaces is_public check
-  .neq('visibility', 'private')  // ← blocks private from public view
-  .single()
+    .from('portfolios')
+    .select(`
+      *,
+      profiles (id, full_name, username, bio, avatar_url, year_of_study),
+      portfolio_tags (tags (name)),
+      portfolio_items (id, type, url, caption, display_order),
+      takedowns (id, reason, appeal_status, appeal_message, appeal_denied_at, scheduled_wipe_at),
+      warnings (id, reason, duration_days, expires_at, created_at)
+    `)
+    .eq('slug', slug)
+    .neq('visibility', 'private')
+    .not('status', 'in', '("taken_down","denied_appeal")')
+    .single()
 
   if (!portfolio) notFound()
 
-  // Fetch like + comment counts for display without auth
   const { count: likeCount } = await supabase
     .from('likes')
     .select('*', { count: 'exact', head: true })
@@ -31,9 +39,28 @@ export default async function PortfolioPage({ params }: { params: Promise<{ slug
 
   const tags = portfolio.portfolio_tags?.map((pt: any) => pt.tags.name) ?? []
   const owner = portfolio.profiles as any
+  const activeWarning = portfolio.warnings?.find((w: any) => new Date(w.expires_at) > new Date())
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '48px 24px 96px' }}>
+
+      {/* Active warning banner (visible to owner via direct link) */}
+      {activeWarning && (
+        <div style={{
+          background: '#78350f', border: '1px solid #92400e',
+          borderRadius: 10, padding: '14px 20px', marginBottom: 24
+        }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#fcd34d', marginBottom: 4 }}>
+            ⚠ This portfolio has an active warning
+          </p>
+          <p style={{ fontSize: 13, color: '#fde68a' }}>
+            Reason: {activeWarning.reason} · Expires{' '}
+            {new Date(activeWarning.expires_at).toLocaleDateString('en-JM', {
+              month: 'short', day: 'numeric', year: 'numeric'
+            })}
+          </p>
+        </div>
+      )}
 
       {/* Cover Image */}
       {portfolio.cover_image_url && (
@@ -75,58 +102,36 @@ export default async function PortfolioPage({ params }: { params: Promise<{ slug
               </span>
             ))}
           </div>
-          {/* Quick stats */}
           <div style={{ display: 'flex', gap: 16 }}>
-            <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-              ♥ {likeCount ?? 0} likes
-            </span>
-            <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-              💬 {commentCount ?? 0} comments
-            </span>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>♥ {likeCount ?? 0} likes</span>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>💬 {commentCount ?? 0} comments</span>
           </div>
         </div>
 
-        {/* Owner card — now a clickable link */}
+        {/* Owner card */}
         <Link href={`/profile/${owner?.username}`} style={{
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 12, padding: '16px 20px',
           display: 'flex', alignItems: 'center', gap: 14,
           minWidth: 200, transition: 'border-color 0.15s'
-        }}
-          onMouseEnter={undefined}
-        >
-          <div style={{
-            width: 44, height: 44, borderRadius: '50%',
-            background: 'var(--accent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, fontWeight: 700, flexShrink: 0
-          }}>
-            {owner?.full_name?.[0]?.toUpperCase() ?? '?'}
-          </div>
+        }}>
+          <Avatar url={owner?.avatar_url} name={owner?.full_name} size={44} />
           <div>
             <p style={{ fontWeight: 600, fontSize: 15 }}>{owner?.full_name}</p>
-            <p style={{ color: 'var(--accent)', fontSize: 13 }}>
-              View profile →
-            </p>
+            <p style={{ color: 'var(--accent)', fontSize: 13 }}>View profile →</p>
           </div>
         </Link>
       </div>
 
-      {/* Divider */}
       <div style={{ height: 1, background: 'var(--border)', margin: '32px 0' }} />
 
-      {/* Description */}
       {portfolio.description && (
-        <p style={{
-          fontSize: 17, lineHeight: 1.75,
-          color: '#d4d4d8', maxWidth: 680
-        }}>
+        <p style={{ fontSize: 17, lineHeight: 1.75, color: '#d4d4d8', maxWidth: 680 }}>
           {portfolio.description}
         </p>
       )}
 
-      {/* Media */}
       {portfolio.portfolio_items && portfolio.portfolio_items.length > 0 && (
         <div style={{ marginTop: 48 }}>
           <h2 style={{
@@ -139,14 +144,13 @@ export default async function PortfolioPage({ params }: { params: Promise<{ slug
         </div>
       )}
 
-      {/* Posted date */}
       <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 32 }}>
         Published {new Date(portfolio.created_at).toLocaleDateString('en-JM', {
           year: 'numeric', month: 'long', day: 'numeric'
         })}
       </p>
 
-      {/* Likes + Comments */}
+      <ReportButton portfolioId={portfolio.id} />
       <LikesAndComments portfolioId={portfolio.id} />
     </div>
   )
