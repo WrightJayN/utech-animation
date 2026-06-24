@@ -9,21 +9,27 @@ A full-stack portfolio platform built for animation students at the **University
 ## Screenshots
 
 ### Discovery Feed
+![Discovery Feed](screenshots/Discovery_Feed.png)
 The home page features an animated hero, tag filters, year filters, and a staggered portfolio grid. Visitors can browse without an account.
 
 ### Student Dashboard
+![Student Dashboard](screenshots/Student_Dashboard.png)
 Students manage all their portfolios in one place with visibility controls (Public, Unlisted, Private), edit access, and status indicators for warnings, takedowns and appeals.
 
 ### Profile Settings
+![Profile Settings](screenshots/Profile_Settings.png)
 Students can upload a profile avatar, set their year of study, and write a bio — all reflected instantly across the platform.
 
 ### New Portfolio
+![New Portfolio](screenshots/New_Portfolio.png)
 The upload flow lets students add a title, description, cover image, media items (images and video), and tags in one form.
 
 ### Portfolio View
+![Portfolio View](screenshots/Portfolio_View.png)
 Each portfolio has a full-page view with a cover image, tags, like and comment counts, a clickable owner card, a zoomable/pannable media lightbox, likes, comments, and a report button.
 
 ### Public Profile
+![Public Profile](screenshots/Public_Profile.png)
 Every student gets a public profile at `/profile/[username]` showing their avatar, bio, year of study, total portfolios, total likes received, and a grid of all their public work.
 
 ---
